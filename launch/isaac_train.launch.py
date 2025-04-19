@@ -8,7 +8,7 @@ def generate_launch_description():
     lidar_node = Node(
         package=pkg_name,
         executable='lidar_preprocessing',
-        name='sensor_preprocessing',
+        name='lidar_preprocessing',
         output='screen',
         # parameters=[
         #     {'angle_bins': 180},
@@ -19,7 +19,7 @@ def generate_launch_description():
     train_node = Node(
         package=pkg_name,
         executable='train',
-        name='isaac_env',
+        name='train',
         output='screen',
     )
     
