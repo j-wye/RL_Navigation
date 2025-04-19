@@ -298,7 +298,7 @@ class IsaacEnvROS2(Node):
         if time_delta < 0:
             time_efficiency *= 2
         
-        progress_delta = self.remain_dist - self.prev_remain_dist
+        progress_delta = self.prev_remain_dist - self.remain_dist
         progress_efficiency = kappa_p * progress_delta
         # if progress_delta < 0:
         #     progress_efficiency *= 2
