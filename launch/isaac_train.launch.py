@@ -25,8 +25,8 @@ def generate_launch_description():
     
     path_visualization_node = Node(
         package=pkg_name,
-        executable='path_visualization',
-        name='path_visualization',
+        executable='path_visualize',
+        name='path_visualize',
         output='screen',
     )
 
