@@ -180,6 +180,7 @@ class TD3(object):
         self.policy_freq = args.policy_freq
 
         self.policy_type = args.policy
+        self.count = 0
 
         #self.device = torch.device("cuda" if args.cuda else "cpu")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -205,7 +206,7 @@ class TD3(object):
         state_add=state_add.unsqueeze(0)
         return self.actor(state,state_add).cpu().data.numpy().flatten()
     
-    def update_parameters(self, memory, args,i):
+    def update_parameters(self, memory, args):
         max_Q=float('-inf')
         av_Q=0
         av_loss=0
@@ -260,9 +261,8 @@ class TD3(object):
                          self.tau * param.data + (1 - self.tau) * target_param.data
                     )
         av_loss+=loss
-        av_loss=av_loss/(i+1)
+        av_loss=av_loss/(self.count+1)
         self.count+=1
-        
         return av_loss, av_Q, max_Q 
 
     # Save model parameters
@@ -273,9 +273,3 @@ class TD3(object):
     def load_checkpoint(self, directory, filename):
         self.actor.load_state_dict(torch.load("%s/%s/%s_actor.pth" % (directory, filename, filename), weights_only=True))
         self.critic.load_state_dict(torch.load("%s/%s/%s_critic.pth" % (directory, filename, filename), weights_only=True))
-
-
-
-
-
-
