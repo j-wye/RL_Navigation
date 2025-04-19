@@ -3,7 +3,7 @@ import rclpy.logging, rclpy.time
 from rclpy.node import Node
 import numpy as np
 import threading, itertools, math, torch, argparse, datetime, os, multiprocessing
-from TD_CBAM import TD3
+from TD_CBAM2 import TD3
 from lidar_preprocessing import LidarPreprocessing
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
@@ -441,7 +441,6 @@ if __name__ == '__main__':
                         action += np.random.normal(0, 0.2, 1)
 
                     if len(memory) > args.batch_size:
-                        # for i in range(args.updates_per_step):
                         av_critic_loss, av_Q, max_Q = agent.update_parameters(memory, args)
 
                         writer.add_scalar('av_critic_loss', av_critic_loss, total_numsteps)
@@ -452,7 +451,6 @@ if __name__ == '__main__':
                     episode_steps += 1
                     total_numsteps += 1
                     episode_reward += reward
-                    # args.updates_per_step +=1
 
                     mask = 1 if episode_steps == max_episode_steps else float(not done)
                     memory.push(state, state_add, action, reward, next_state, next_state_add, mask)
@@ -467,9 +465,9 @@ if __name__ == '__main__':
                 writer.add_scalar('reward/train', episode_reward, i_episode)
                 print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
 
-                if i_episode % 10 == 0 and args.eval is True:
+                if i_episode % 20 == 0 and args.eval is True:
                     avg_reward = 0.
-                    episodes = 10
+                    episodes = 20
                     for i  in range(episodes):
                         print(f"eval episode{i}")
                         state, state_add = env.reset()
