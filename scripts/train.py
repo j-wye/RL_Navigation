@@ -299,8 +299,9 @@ class IsaacEnvROS2(Node):
             time_efficiency *= 2
         
         progress_delta = self.remain_dist - self.prev_remain_dist
+        progress_efficiency = kappa_p * progress_delta
         if progress_delta < 0:
-            progress_efficiency = kappa_p * progress_delta
+            progress_efficiency *= 2
         
         reward = dist_efficiency + time_efficiency + progress_efficiency
         if reward <= -100 or time_steps >= max_episode_steps:
