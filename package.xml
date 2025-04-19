@@ -3,7 +3,7 @@
 <package format="3">
   <name>rl_navigation</name>
   <version>0.0.0</version>
-  <description>TD3 training with Isaacsim</description>
+  <description>RL based Navigation with Isaac Sim</description>
   <maintainer email="jongyoonpark0621@gmail.com">j-wye</maintainer>
   <license>TODO</license>
 

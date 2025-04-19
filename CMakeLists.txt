@@ -18,8 +18,6 @@ find_package(rviz2 REQUIRED)
 
 install(
   DIRECTORY
-  config
-  launch
   scripts
   usd
   DESTINATION share/${PROJECT_NAME}
