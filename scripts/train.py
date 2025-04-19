@@ -287,7 +287,7 @@ class IsaacEnvROS2(Node):
         sigma = self.euclidean_dist / 3
         kappa_d = 100
         kappa_t = kappa_d / 10
-        kappa_p = kappa_d
+        kappa_p = kappa_d * 10
         additional_reward = kappa_d
         beta = self.euclidean_dist / time_threshold
         
@@ -300,8 +300,8 @@ class IsaacEnvROS2(Node):
         
         progress_delta = self.prev_remain_dist - self.remain_dist
         progress_efficiency = kappa_p * progress_delta
-        # if progress_delta < 0:
-        #     progress_efficiency *= 2
+        if progress_delta < 0:
+            progress_efficiency *= 2
         
         reward = dist_efficiency + time_efficiency + progress_efficiency
         if reward <= -100 or time_steps >= max_episode_steps:
