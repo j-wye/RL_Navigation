@@ -1,37 +1,24 @@
 import os
 from launch import LaunchDescription
-from launch_ros.actions import Node
+from launch.actions import ExecuteProcess
 
 def generate_launch_description():
-    pkg_name = 'rl_navigation'
-
-    lidar_node = Node(
-        package=pkg_name,
-        executable='lidar_preprocessing',
-        name='lidar_preprocessing',
-        output='screen',
-        # parameters=[
-        #     {'angle_bins': 180},
-        #     {'z_bins': 10},
-        # ]
-    )
+    pkg_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
     
-    train_node = Node(
-        package=pkg_name,
-        executable='train',
-        name='train',
-        output='screen',
-    )
-    
-    path_visualization_node = Node(
-        package=pkg_name,
-        executable='path_visualize',
-        name='path_visualize',
-        output='screen',
-    )
-
     return LaunchDescription([
-        lidar_node,
-        train_node,
-        path_visualization_node,
+        ExecuteProcess(
+            cmd=['python3', f'{pkg_path}/scripts/lidar_preprocessing.py'],
+            output='screen',
+            name='lidar_preprocessing'
+        ),
+        ExecuteProcess(
+            cmd=['python3', f'{pkg_path}/scripts/train.py'],
+            output='screen',
+            name='train'
+        ),
+        ExecuteProcess(
+            cmd=['python3', f'{pkg_path}/scripts/path_visualize.py'],
+            output='screen',
+            name='path_visualize'
+        ),
     ])
