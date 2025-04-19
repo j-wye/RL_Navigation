@@ -4,7 +4,6 @@ from rclpy.node import Node
 import numpy as np
 import threading, itertools, math, torch, argparse, datetime, os, multiprocessing
 from TD_CBAM import TD3
-from a_star import AStarPlanner
 from lidar_preprocessing import LidarPreprocessing
 from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
@@ -288,9 +287,11 @@ class IsaacEnvROS2(Node):
         sigma = self.euclidean_dist / 3
         kappa_d = 100
         kappa_t = kappa_d / 10
-        kappa_p = kappa_d / 10
+        kappa_p = kappa_d
         additional_reward = kappa_d
         beta = self.euclidean_dist / time_threshold
+        
+        dist_efficiency = kappa_d * np.exp(-self.remain_dist**2 / (2 * sigma**2))
         
         time_delta = self.euclidean_dist - self.remain_dist - beta * time_steps
         time_efficiency = kappa_t * np.sign(time_delta) * time_delta**2
@@ -298,11 +299,9 @@ class IsaacEnvROS2(Node):
             time_efficiency *= 2
         
         progress_delta = self.remain_dist - self.prev_remain_dist
-        progress_efficiency = kappa_p * np.sign(progress_delta) * progress_delta**2
         if progress_delta < 0:
-            progress_efficiency *= 2
+            progress_efficiency = kappa_p * progress_delta
         
-        dist_efficiency = kappa_d * np.exp(-self.remain_dist**2 / (2 * sigma**2))
         reward = dist_efficiency + time_efficiency + progress_efficiency
         if reward <= -100 or time_steps >= max_episode_steps:
             self.get_logger().info(f"TIME OVER! DONE.")
@@ -331,7 +330,7 @@ class IsaacEnvROS2(Node):
         angle_diff = ((angle_diff + np.pi) % (2 * np.pi)) - np.pi
         angle_diff = abs(angle_diff)
         
-        angle_margin = np.pi / 18
+        angle_margin = np.pi / 4
         alignment_weight = d_kappa / 5
         
         alignment_penalty = alignment_weight * max(angle_diff - angle_margin, 0)
