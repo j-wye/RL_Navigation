@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(td3_train)
+project(rl_navigation)
 
 # Default to C++14
 if(NOT CMAKE_CXX_STANDARD)
@@ -15,7 +15,6 @@ find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rviz2 REQUIRED)
-# ament_python_install_package(${PROJECT_NAME})
 
 install(
   DIRECTORY
