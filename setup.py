@@ -22,9 +22,9 @@ setup(
     license='TODO: License declaration',
     entry_points={
         'console_scripts': [
-            'lidar_preprocessing = rl_navigation.scripts.lidar_preprocessing:main',
-            'train = rl_navigation.scripts.train:main',
-            'path_visualize = rl_navigation.scripts.path_visualize:main',
+            'lidar_preprocessing = scripts.lidar_preprocessing:main',
+            'train = scripts.train:main',
+            'path_visualize = scripts.path_visualize:main',
         ],
     },
 )
