@@ -267,7 +267,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, default=12001, metavar='N', help='maximum number of steps (default: 5000)')
     parser.add_argument('--hidden_size', type=int, default=128, metavar='N', help='hidden size (default: 256)')
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
-    parser.add_argument('--start_steps', type=int, default=10000, metavar='N',help='Steps sampling random actions (default: 10000)')
+    parser.add_argument('--start_steps', type=int, default=1000000, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
     parser.add_argument('--replay_size', type=int, default=500000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     memory = ReplayMemory(args.replay_size, args.seed)
     memory.clear()
     total_numsteps = 0
-    max_episode_steps = 100000
+    max_episode_steps = 10000000
     
     try:
         while rclpy.ok():
