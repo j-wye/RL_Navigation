@@ -56,7 +56,7 @@ class PathVisualizer(Node):
         
         current_x = int(self.width - self.pose[0] * self.scale)
         current_y = int(self.height - self.pose[1] * self.scale)
-        cv2.circle(canvas, (current_y, current_x), int(0.4 * self.scale), (0, 0, 255), 1)
+        cv2.circle(canvas, (current_y, current_x), int(0.33 * self.scale), (0, 0, 255), 1)
         
         for coord in self.cylinder_coords:
             px = int(self.width - coord[0] * self.scale)

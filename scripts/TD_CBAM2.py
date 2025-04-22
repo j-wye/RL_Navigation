@@ -1,12 +1,7 @@
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
-
-
-from torch.utils.tensorboard import SummaryWriter
-import math
 
 class Feature(nn.Module):
     def __init__(self):
@@ -172,7 +167,6 @@ class Critic(nn.Module):
 class TD3(object):
 
     def __init__(self,num_inputs_add, action_space, args):
-
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
@@ -186,16 +180,16 @@ class TD3(object):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         #initialize the actor network
-        self.actor=Actor(num_inputs_add,action_space,self.hidden_size).to(self.device)
-        self.actor_target=Actor(num_inputs_add, action_space,self.hidden_size).to(self.device)
+        self.actor = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.actor_target = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optimizer=torch.optim.Adam(self.actor.parameters())
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters())
 
         #initialize the critic network
-        self.critic=Critic(num_inputs_add,action_space,self.hidden_size).to(self.device)
-        self.critic_target=Critic(num_inputs_add,action_space,self.hidden_size).to(self.device)
+        self.critic = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.critic_target = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optimizer=torch.optim.Adam(self.critic.parameters())
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters())
 
         self.count=0
 
@@ -223,8 +217,8 @@ class TD3(object):
 
         next_action=self.actor_target(next_state_batch,next_state_batch_add)
 
-        noise=torch.Tensor(action_batch).data.normal_(0,0.2).to(self.device)
-        noise=noise.clamp(-0.5,0.5)        
+        noise = torch.randn_like(action_batch).to(self.device)
+        noise = noise.clamp(-0.5, 0.5)       
         next_action=(next_action+noise).clamp(-0.7853981633974483,0.7853981633974483)
 
         target_Q1,target_Q2=self.critic_target(next_state_batch,next_state_batch_add,next_action)
@@ -232,43 +226,37 @@ class TD3(object):
         target_Q=torch.min(target_Q1,target_Q2)
         av_Q+=torch.mean(target_Q)
         max_Q=max(max_Q,torch.max(target_Q))
-        target_Q=reward_batch+(torch.ones_like(mask_batch)-mask_batch)*args.gamma*target_Q.detach() # here I should change 1 to same size of mask_batch
+        target_Q = reward_batch + ((torch.ones_like(mask_batch) - mask_batch)* self. gamma * target_Q).detach()
 
-        current_Q1,current_Q2=self.critic(state_batch,state_batch_add,action_batch)
-        loss=F.mse_loss(current_Q1,target_Q)+F.mse_loss(current_Q2,target_Q)
+        current_Q1, current_Q2 = self.critic(state_batch, state_batch_add, action_batch)
+        loss = F.mse_loss(current_Q1, target_Q)+F.mse_loss(current_Q2, target_Q)
 
         self.critic_optimizer.zero_grad()
         loss.backward()
         self.critic_optimizer.step()
 
         if self.count%self.policy_freq==0:
-            actor_grad,_=self.critic(state_batch,state_batch_add,self.actor(state_batch,state_batch_add))
-            actor_grad=-actor_grad.mean()
+            actor_grad,_ = self.critic(state_batch, state_batch_add, self.actor(state_batch, state_batch_add))
+            actor_grad =- actor_grad.mean()
             self.actor_optimizer.zero_grad()
             actor_grad.backward()
             self.actor_optimizer.step()
 
-            for param,target_param in zip(
-                self.actor.parameters(),self.actor_target.parameters()
-            ):
-                target_param.data.copy_(
-                    self.tau * param.data + (1 - self.tau) * target_param.data
-                )
-            for param, target_param in zip(
-                    self.critic.parameters(), self.critic_target.parameters()
-                ):
-                    target_param.data.copy_(
-                         self.tau * param.data + (1 - self.tau) * target_param.data
-                    )
-        av_loss+=loss
-        av_loss=av_loss/(self.count+1)
-        self.count+=1
+            for param,target_param in zip(self.actor.parameters(),self.actor_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        
+        av_loss += loss
+        av_loss /= (self.count+1)
+        self.count += 1
         return av_loss, av_Q, max_Q 
 
     # Save model parameters
     def save_checkpoint(self, directory, filename, i):
         torch.save(self.actor.state_dict(), "%s/%s/%s_actor_%d.pth" % (directory, filename, filename, i))
         torch.save(self.critic.state_dict(), "%s/%s/%s_critic_%d.pth" % (directory, filename, filename, i))
+    
     # Load model parameters
     def load_checkpoint(self, directory, filename):
         self.actor.load_state_dict(torch.load("%s/%s/%s_actor.pth" % (directory, filename, filename), weights_only=True))

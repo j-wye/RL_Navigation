@@ -1,24 +1,19 @@
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
-from utils import soft_update, hard_update
-
-from torch.utils.tensorboard import SummaryWriter
-import math
 
 class CBAM(nn.Module):
     def __init__(self, channels, r):
         super(CBAM, self).__init__()
         self.channels = channels
         self.r = r
-        self.sam=SAM(bias=False)
-        self.cam=CAM(self.channels, r=self.r)
+        self.sam = SAM(bias=False)
+        self.cam = CAM(self.channels, r=self.r)
 
     def forward(self, x):
-        output=self.cam(x)
-        output=self.sam(output)
+        output = self.cam(x)
+        output = self.sam(output)
         return output
     
 class SAM(nn.Module):
@@ -63,13 +58,13 @@ class Actor(nn.Module):
         self.layer_2 = nn.Linear(hidden_dim, hidden_dim)
         self.layer_3 = nn.Linear(hidden_dim, 1)
         self.tanh = nn.Tanh()
-        self.cbam=CBAM(channels=180,r=3)
+        self.cbam = CBAM(channels=180, r=3)
 
     def forward(self, s,s_a):
-        s=self.cbam(s)
-        b,_,_,_=s.size()
-        s=s.view(b,-1)
-        s=torch.concat((s,s_a),1)  
+        s = self.cbam(s)
+        b, _, _, _ = s.size()
+        s = s.view(b,-1)
+        s = torch.concat((s,s_a), 1)
 
         s = F.relu(self.layer_1(s))
         s = F.relu(self.layer_2(s))
@@ -93,11 +88,10 @@ class Critic(nn.Module):
         self.layer_6 = nn.Linear(hidden_dim, 1)
 
     def forward(self, s,s_a, a):
-        s=self.cbam(s)
-        b,_,_,_=s.size()
-        s=s.view(b,-1)
-        s=torch.concat((s,s_a),1)  
-
+        s = self.cbam(s)
+        b, _, _, _ = s.size()
+        s = s.view(b,-1)
+        s = torch.concat((s,s_a), 1)
 
         s1 = F.relu(self.layer_1(s))
         self.layer_2_s(s1)
@@ -118,46 +112,43 @@ class Critic(nn.Module):
         return q1,q2
 
 class TD3(object):
-
     def __init__(self,num_inputs_add, action_space, args):
 
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
-        self.hidden_size=args.hidden_size
+        self.hidden_size = args.hidden_size
         self.policy_freq = args.policy_freq
 
         self.policy_type = args.policy
-        self.count=0
+        self.count = 0
 
-        #self.device = torch.device("cuda" if args.cuda else "cpu")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         #initialize the actor network
-        self.actor=Actor(num_inputs_add,action_space,self.hidden_size).to(self.device)
-        self.actor_target=Actor(num_inputs_add, action_space,self.hidden_size).to(self.device)
+        self.actor = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.actor_target = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optimizer=torch.optim.Adam(self.actor.parameters())
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters())
 
         #initialize the critic network
-        self.critic=Critic(num_inputs_add,action_space,self.hidden_size).to(self.device)
-        self.critic_target=Critic(num_inputs_add,action_space,self.hidden_size).to(self.device)
+        self.critic = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.critic_target = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
-        self.critic_optimizer=torch.optim.Adam(self.critic.parameters())
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters())
 
-    def select_action(self, state,state_add):#, evaluate=False):
+    def select_action(self, state, state_add):
         state = torch.FloatTensor(state).to(self.device)
-        state=state.unsqueeze(0)
-        state_add=torch.FloatTensor(state_add).to(self.device)
-        state_add=state_add.unsqueeze(0)
+        state = state.unsqueeze(0)
+        state_add = torch.FloatTensor(state_add).to(self.device)
+        state_add = state_add.unsqueeze(0)
         return self.actor(state,state_add).cpu().data.numpy().flatten()
     
     def update_parameters(self, memory, args):
         max_Q=float('-inf')
         av_Q=0
         av_loss=0
-        # Sample a batch from memory
-        state_batch,state_batch_add, action_batch, reward_batch, next_state_batch,next_state_batch_add, mask_batch = memory.sample(batch_size=args.batch_size)
+        state_batch, state_batch_add, action_batch, reward_batch, next_state_batch, next_state_batch_add, mask_batch = memory.sample(batch_size=args.batch_size)
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         state_batch_add = torch.FloatTensor(state_batch_add).to(self.device)
@@ -167,47 +158,38 @@ class TD3(object):
         reward_batch = torch.FloatTensor(reward_batch).to(self.device).view(-1, 1)
         mask_batch = torch.FloatTensor(mask_batch).to(self.device).view(-1, 1)
 
-        next_action=self.actor_target(next_state_batch,next_state_batch_add)
+        next_action = self.actor_target(next_state_batch, next_state_batch_add)
 
-        noise=torch.Tensor(action_batch).data.normal_(0,0.2).to(self.device)
-        noise=noise.clamp(-0.5,0.5)        
-        next_action=(next_action+noise).clamp(-0.7853981633974483,0.7853981633974483)
+        noise = torch.randn_like(action_batch).to(self.device)
+        noise = noise.clamp(-0.2, 0.2)
+        next_action=(next_action + noise).clamp(-0.7853981633974483,0.7853981633974483)
 
-        target_Q1,target_Q2=self.critic_target(next_state_batch,next_state_batch_add,next_action)
-
-        target_Q=torch.min(target_Q1,target_Q2)
-        av_Q+=torch.mean(target_Q)
-        max_Q=max(max_Q,torch.max(target_Q))
-        target_Q=reward_batch+(torch.ones_like(mask_batch)-mask_batch)*args.gamma*target_Q.detach() # here I should change 1 to same size of mask_batch
-
-        current_Q1,current_Q2=self.critic(state_batch,state_batch_add,action_batch)
-        loss=F.mse_loss(current_Q1,target_Q)+F.mse_loss(current_Q2,target_Q)
+        target_Q1, target_Q2 = self.critic_target(next_state_batch, next_state_batch_add, next_action)
+        target_Q = torch.min(target_Q1, target_Q2)
+        av_Q += torch.mean(target_Q)
+        max_Q = max(max_Q, torch.max(target_Q))
+        target_Q = reward_batch + ((torch.ones_like(mask_batch) - mask_batch)* self.gamma * target_Q).detach()
+        
+        current_Q1, current_Q2 = self.critic(state_batch, state_batch_add, action_batch)
+        loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
 
         self.critic_optimizer.zero_grad()
         loss.backward()
         self.critic_optimizer.step()
 
-        if self.count%self.policy_freq==0:
-            actor_grad,_=self.critic(state_batch,state_batch_add,self.actor(state_batch,state_batch_add))
-            actor_grad=-actor_grad.mean()
+        if self.count % self.policy_freq == 0:
+            actor_grad, _ = self.critic(state_batch, state_batch_add, self.actor(state_batch, state_batch_add))
+            actor_grad = -actor_grad.mean()
             self.actor_optimizer.zero_grad()
             actor_grad.backward()
             self.actor_optimizer.step()
-            for param,target_param in zip(
-                self.actor.parameters(),self.actor_target.parameters()
-            ):
-                target_param.data.copy_(
-                    self.tau * param.data + (1 - self.tau) * target_param.data
-                )
-            for param, target_param in zip(
-                    self.critic.parameters(), self.critic_target.parameters()
-                ):
-                    target_param.data.copy_(
-                         self.tau * param.data + (1 - self.tau) * target_param.data
-                    )
-        av_loss+=loss
-        av_loss=av_loss/(self.count+1)
-        self.count+=1
+            for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+            for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+                target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        av_loss += loss
+        av_loss /= (self.count + 1)
+        self.count += 1
         return av_loss, av_Q, max_Q 
 
     # Save model parameters
