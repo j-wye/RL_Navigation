@@ -11,9 +11,8 @@ class RewardFunction:
         self.done = False
         self.time_threshold = 2000
         self.sigma = euclidean_dist / 3
-        self.kappa_d = 500
-        self.kappa_p = self.kappa_d
-        self.additional_reward = self.kappa_d
+        self.kappa_d = 100
+        self.kappa_p = self.kappa_d / 2
     
     def original(self, remain_dist: float):
         kappa = 50*np.sqrt(2)
@@ -24,17 +23,17 @@ class RewardFunction:
             R_t = -np.exp(-0.4 * (self.time_steps - self.time_threshold) - 1)
         
         R = R_d + R_t
-        if R <= -self.additional_reward or self.time_steps >= self.max_episode_steps:
+        if R <= -self.kappa_d or self.time_steps >= self.max_episode_steps:
             print(f"TIME OVER / REWARD -INF")
-            R -= self.additional_reward
+            R -= self.kappa_d
             self.done = True
         elif self.collision_bool == True:
             print(f"COLLISION OCCUR! DONE")
-            R -= self.additional_reward
+            R -= self.kappa_d
             self.done = True
         elif remain_dist <= np.sqrt(2):
             print(f"REACH GOAL! DONE")
-            R += self.additional_reward
+            R += self.kappa_d
             self.done = True
         print(f"Reward : {R:.2f}, Dist Reward : {R_d:.2f}, Time Reward : {R_t:.2f}")
         return R, self.done
@@ -49,20 +48,20 @@ class RewardFunction:
         if delta_p < 0:
             ETA_p *= 2
         
-        ETA_t = max(0, self.time_steps - self.time_threshold / 2)
+        ETA_t = max(0, self.time_steps - self.time_threshold / 2) // 2
         
         R = ETA_d + ETA_p - ETA_t
-        if R <= -self.additional_reward or self.time_steps >= self.max_episode_steps:
+        if R <= -self.kappa_d or self.time_steps >= self.max_episode_steps:
             print(f"TIME OVER or REWARD -INF")
-            R -= self.additional_reward
+            R -= self.kappa_d
             self.done = True
         elif self.collision_bool == True:
             print(f"COLLISION OCCUR! DONE")
-            R -= self.additional_reward
+            R -= self.kappa_d
             self.done = True
         elif remain_dist <= np.sqrt(2):
             print(f"REACH GOAL! DONE")
-            R += self.additional_reward
+            R += self.kappa_d
             self.done = True
         print(f"Reward : {R:.2f}, Dist Reward : {ETA_d:.2f}, Progress Reward : {ETA_p:.2f}, Time Reward : -{ETA_t:.2f}")
         return R, self.done
