@@ -15,7 +15,7 @@ alias path='python3 ~/rl_navigation/src/scripts/path.py'
 alias ts='tensorboard --logdir=~/rl_navigation/src/runs'
 ```
 
-How to Use or Train:
+Just for update Several or Specific Code Examples:
 ```bash
-
+cd ~/rl_navigation/src/scripts && wget https://raw.githubusercontent.com/j-wye/RL_Navigation/refs/heads/main/scripts/TD_CBAM.py
 ```
