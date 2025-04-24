@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
+import numpy as np
 
 class CBAM(nn.Module):
     def __init__(self, channels, r):
@@ -36,9 +37,9 @@ class CAM(nn.Module):
         self.channels = channels
         self.r = r
         self.linear_max = nn.Sequential(
-            nn.Linear(in_features=self.channels, out_features=self.channels//self.r, bias=True),
+            nn.Linear(in_features = self.channels, out_features = self.channels//self.r, bias=True),
             nn.ReLU(inplace=True),
-            nn.Linear(in_features=self.channels//self.r, out_features=self.channels, bias=True))
+            nn.Linear(in_features = self.channels//self.r, out_features = self.channels, bias=True))
 
     def forward(self, x):
         max = F.adaptive_max_pool2d(x, output_size=1)
@@ -51,14 +52,14 @@ class CAM(nn.Module):
         return output
     
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim,hidden_dim):
+    def __init__(self,input_shape,state_dim, action_dim,hidden_dim):
         super(Actor, self).__init__()
 
-        self.layer_1 = nn.Linear(state_dim+5400, hidden_dim)
+        self.layer_1 = nn.Linear(state_dim + np.prod(input_shape), hidden_dim)
         self.layer_2 = nn.Linear(hidden_dim, hidden_dim)
-        self.layer_3 = nn.Linear(hidden_dim, 1)
+        self.layer_3 = nn.Linear(hidden_dim, action_dim)
         self.tanh = nn.Tanh()
-        self.cbam = CBAM(channels=180, r=3)
+        self.cbam = CBAM(channels=input_shape[0], r=3)
 
     def forward(self, s,s_a):
         s = self.cbam(s)
@@ -72,22 +73,20 @@ class Actor(nn.Module):
         return a
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, action_dim,hidden_dim):
+    def __init__(self, input_shape, state_dim, action_dim, hidden_dim):
         super(Critic, self).__init__()
-
-        self.cbam=CBAM(channels=180,r=30)
-
-        self.layer_1 = nn.Linear(state_dim+5400, hidden_dim)
+        self.cbam = CBAM(channels = input_shape[0], r=30)
+        self.layer_1 = nn.Linear(state_dim + np.prod(input_shape), hidden_dim)
         self.layer_2_s = nn.Linear(hidden_dim, hidden_dim)
-        self.layer_2_a = nn.Linear(1, hidden_dim)
-        self.layer_3 = nn.Linear(hidden_dim, 1)
+        self.layer_2_a = nn.Linear(action_dim, hidden_dim)
+        self.layer_3 = nn.Linear(hidden_dim, action_dim)
 
-        self.layer_4 = nn.Linear(state_dim+5400, hidden_dim)
+        self.layer_4 = nn.Linear(state_dim + np.prod(input_shape), hidden_dim)
         self.layer_5_s = nn.Linear(hidden_dim, hidden_dim)
-        self.layer_5_a = nn.Linear(1, hidden_dim)
-        self.layer_6 = nn.Linear(hidden_dim, 1)
+        self.layer_5_a = nn.Linear(action_dim, hidden_dim)
+        self.layer_6 = nn.Linear(hidden_dim, action_dim)
 
-    def forward(self, s,s_a, a):
+    def forward(self, s, s_a, a):
         s = self.cbam(s)
         b, _, _, _ = s.size()
         s = s.view(b,-1)
@@ -112,8 +111,7 @@ class Critic(nn.Module):
         return q1,q2
 
 class TD3(object):
-    def __init__(self,num_inputs_add, action_space, args):
-
+    def __init__(self, input_shape, num_inputs_add, action_space, args):
         self.gamma = args.gamma
         self.tau = args.tau
         self.alpha = args.alpha
@@ -125,15 +123,13 @@ class TD3(object):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        #initialize the actor network
-        self.actor = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
-        self.actor_target = Actor(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.actor = Actor(input_shape, num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.actor_target = Actor(input_shape, num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters())
 
-        #initialize the critic network
-        self.critic = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
-        self.critic_target = Critic(num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.critic = Critic(input_shape, num_inputs_add, action_space, self.hidden_size).to(self.device)
+        self.critic_target = Critic(input_shape, num_inputs_add, action_space, self.hidden_size).to(self.device)
         self.critic_target.load_state_dict(self.critic.state_dict())
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters())
 
@@ -162,7 +158,7 @@ class TD3(object):
 
         noise = torch.randn_like(action_batch).to(self.device)
         noise = noise.clamp(-0.2, 0.2)
-        next_action=(next_action + noise).clamp(-0.7853981633974483,0.7853981633974483)
+        next_action = (next_action + noise).clamp(-0.7853981633974483,0.7853981633974483)
 
         target_Q1, target_Q2 = self.critic_target(next_state_batch, next_state_batch_add, next_action)
         target_Q = torch.min(target_Q1, target_Q2)
@@ -196,6 +192,7 @@ class TD3(object):
     def save_checkpoint(self, directory, filename, i):
         torch.save(self.actor.state_dict(), "%s/%s/%s_actor_%d.pth" % (directory, filename, filename, i))
         torch.save(self.critic.state_dict(), "%s/%s/%s_critic_%d.pth" % (directory, filename, filename, i))
+    
     # Load model parameters
     def load_checkpoint(self, directory, filename):
         self.actor.load_state_dict(torch.load("%s/%s/%s_actor.pth" % (directory, filename, filename), weights_only=True))

@@ -41,7 +41,7 @@ simulation_context.initialize_physics()
 simulation_context.play()
 
 class IsaacEnvROS2(Node):
-    def __init__(self, size, angle_bins, z_bins):
+    def __init__(self, size, angle_bins: int, z_bins: int):
         super().__init__('env')
         self.size = size
         self.offset = 1.0
@@ -52,18 +52,18 @@ class IsaacEnvROS2(Node):
         self.start = np.zeros(2, dtype=np.float32)
         self.goal = np.array([self.size, self.size], dtype=np.float32)
         self.euclidean_dist = np.linalg.norm(self.goal - self.start)
-        self.max_vel = 1.0
+        # self.max_vel = 1.0
         self.min_vel = 0.5
-        self.max_omega = 0.7853981633974483
+        self.max_omega = math.pi / 4
         self.COLLISION_THRESHOLD = 0.33
         self.collision_bool = False
         self.done = False
         self.remain_dist = self.euclidean_dist
-        self.local_min_dist = 10.0
+        self.local_min_dist = self.euclidean_dist
         
         # TD3 Network Settings
         self.voxel_data = torch.from_numpy(np.zeros((angle_bins, z_bins, 3), dtype=np.float32))
-        self.goal_state = torch.from_numpy(np.array([self.goal[0] - self.pose[0], self.goal[1] - self.pose[1]]))
+        self.goal_state = torch.from_numpy(self.goal - self.pose[:2])
         self.next_state = (self.voxel_data, self.goal_state)
         self.next_state_add = self.goal - self.pose[:2]
         
@@ -142,7 +142,7 @@ class IsaacEnvROS2(Node):
         self.cmd_vel.angular.z = 0.0
         self.local_min_dist = 10.0
     
-    def reset_static(self):
+    def reset(self):
         simulation_context.reset()
         self.parameters_reset()
         obstacle = Obstacle(self.size)
@@ -178,7 +178,7 @@ class IsaacEnvROS2(Node):
         
         if self.local_min_dist > self.COLLISION_THRESHOLD:
             self.collision_bool = False
-        else:
+        elif 0.2 < self.local_min_dist < self.COLLISION_THRESHOLD:
             self.collision_bool = True
         reward_function = RewardFunction(self.euclidean_dist, time_steps, max_episode_steps, self.collision_bool)
         reward, self.done = reward_function.optimized(self.remain_dist)
@@ -267,9 +267,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, default=12001, metavar='N', help='maximum number of steps (default: 5000)')
     parser.add_argument('--hidden_size', type=int, default=128, metavar='N', help='hidden size (default: 256)')
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
-    parser.add_argument('--start_steps', type=int, default=1000000, metavar='N',help='Steps sampling random actions (default: 10000)')
+    parser.add_argument('--start_steps', type=int, default=100000, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
-    parser.add_argument('--replay_size', type=int, default=500000, metavar='N', help='size of replay buffer (default: 10000000)')
+    parser.add_argument('--replay_size', type=int, default=400000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
     parser.add_argument('--cuda', action="store_true", default=True, help='run on CUDA (default: False)')
     args = parser.parse_args()
@@ -290,11 +290,12 @@ if __name__ == '__main__':
     np.random.seed(args.seed)
 
     # Agent
-    action_space = np.ones(1)
+    action_space = 1
     env.get_logger().info(f"state_space:{len(env.next_state)}")
     env.get_logger().info(f"action_space:{action_space}")
     env.get_logger().info(f"args : {args}")
-    agent = TD3(len(env.next_state), action_space, args)
+    input_shape = (angle_bins, z_bins, 3)
+    agent = TD3(input_shape, len(env.next_state), action_space, args)
     file_name = "checkpoints"
     try:
         agent.load_checkpoint(pkg_path, file_name)
@@ -302,7 +303,7 @@ if __name__ == '__main__':
     except:
         env.get_logger().info("No checkpoint found, start training from scratch.")
 
-    writer = SummaryWriter(f'runs/{datetime.datetime.now().strftime("%d : %H-%M")}')
+    writer = SummaryWriter(f'runs/{datetime.datetime.now().strftime("%m%d_%H-%M")}')
 
     # Memory
     memory = ReplayMemory(args.replay_size, args.seed)
@@ -318,7 +319,7 @@ if __name__ == '__main__':
                 done = False
                 
                 # state, state_add = env.reset()
-                state, state_add = env.reset_static()
+                state, state_add = env.reset()
                 
                 while not done:
                     print(f"episode step:{episode_steps}, in total:{total_numsteps}/{args.num_steps}")
@@ -346,16 +347,15 @@ if __name__ == '__main__':
                     state = next_state
                     state_add = next_state_add
 
-                if total_numsteps > args.num_steps:
-                    env.get_logger().info(f"Training finished after {total_numsteps} steps")
-                    break
+                # if total_numsteps > args.num_steps:
+                #     break
 
                 writer.add_scalar('reward/train', episode_reward, i_episode)
-                print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
+                print(f"Episode: {i_episode}, total numsteps: {total_numsteps}, episode steps: {episode_steps}, reward: {round(episode_reward, 2)}")
 
-                if i_episode % 20 == 0 and args.eval is True:
+                if i_episode % 10 == 0 and args.eval is True:
                     avg_reward = 0.
-                    episodes = 20
+                    episodes = 10
                     for i  in range(episodes):
                         print(f"eval episode{i}")
                         state, state_add = env.reset()
