@@ -17,5 +17,5 @@ alias ts='tensorboard --logdir=~/rl_navigation/src/runs'
 
 Just for update Several or Specific Code Examples:
 ```bash
-cd ~/rl_navigation/src/scripts && wget https://raw.githubusercontent.com/j-wye/RL_Navigation/refs/heads/main/scripts/TD_CBAM.py
+cd ~/rl_navigation/src/scripts && wget -O https://raw.githubusercontent.com/j-wye/RL_Navigation/refs/heads/main/scripts/TD_CBAM.py
 ```
