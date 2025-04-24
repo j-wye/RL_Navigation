@@ -267,7 +267,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, default=12001, metavar='N', help='maximum number of steps (default: 5000)')
     parser.add_argument('--hidden_size', type=int, default=128, metavar='N', help='hidden size (default: 256)')
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
-    parser.add_argument('--start_steps', type=int, default=100000, metavar='N',help='Steps sampling random actions (default: 10000)')
+    parser.add_argument('--start_steps', type=int, default=500000, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
     parser.add_argument('--replay_size', type=int, default=400000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
@@ -317,13 +317,16 @@ if __name__ == '__main__':
                 episode_reward = 0
                 episode_steps = 0
                 done = False
+                share = 10000
                 
-                # state, state_add = env.reset()
                 state, state_add = env.reset()
                 
                 while not done:
                     print(f"episode step:{episode_steps}, total steps:{total_numsteps}")
-                    if args.start_steps > total_numsteps:
+                    if total_numsteps >= args.start_steps:
+                        action = agent.select_action(state, state_add)
+                        action += np.random.normal(-0.2, 0.2, 1)
+                    elif total_numsteps % share <= 0.7*share:
                         action = np.random.uniform(-math.pi/4, math.pi/4, 1)
                     else:
                         action = agent.select_action(state, state_add)
@@ -346,9 +349,6 @@ if __name__ == '__main__':
 
                     state = next_state
                     state_add = next_state_add
-
-                # if total_numsteps > args.num_steps:
-                #     break
 
                 writer.add_scalar('reward/train', episode_reward, i_episode)
                 print(f"Episode: {i_episode}, total numsteps: {total_numsteps}, episode steps: {episode_steps}, reward: {round(episode_reward, 2)}")
@@ -378,7 +378,7 @@ if __name__ == '__main__':
                     print(f"Test Episodes: {episodes}, Avg. Reward: {round(avg_reward, 2)}")
                     print("--------------------------------------------------------------------------------")
                     
-                if i_episode % 40 == 0:
+                if i_episode % 20 == 0:
                     agent.save_checkpoint(pkg_path, file_name, i_episode)
 
     except KeyboardInterrupt:
