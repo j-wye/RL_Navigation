@@ -322,7 +322,7 @@ if __name__ == '__main__':
                 state, state_add = env.reset()
                 
                 while not done:
-                    print(f"episode step:{episode_steps}, in total:{total_numsteps}/{args.num_steps}")
+                    print(f"episode step:{episode_steps}, total steps:{total_numsteps}")
                     if args.start_steps > total_numsteps:
                         action = np.random.uniform(-math.pi/4, math.pi/4, 1)
                     else:
