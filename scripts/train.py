@@ -250,6 +250,22 @@ class Obstacle():
             self.create_cylinder(f"/World/Obstacles/Cylinder_{i}", coords)
             cylinder_coords.append(coords)
         return cylinder_coords
+    
+    def three_random(self):
+        self.create_wall()
+        cylinder_coords = []
+        one_side_parts = 4
+        region_size = self.size / one_side_parts
+        obstacle_num = 3
+        for i in range(obstacle_num):
+            coords = [
+                np.random.uniform(0, self.size),
+                np.random.uniform(region_size, self.size - region_size),
+                self.cylinder_height / 2
+            ]
+            self.create_cylinder(f"/World/Obstacles/Cylinder_{i}", coords)
+            cylinder_coords.append(coords)
+        return cylinder_coords
 
 if __name__ == '__main__':
     rclpy.init(args=None)
