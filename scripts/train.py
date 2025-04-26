@@ -75,7 +75,6 @@ class IsaacEnvROS2(Node):
         self.publisher_cylinder_coords = self.create_publisher(Float32MultiArray, '/cylinder_coords', self.qos)
         self.publisher_robot_pose = self.create_publisher(Float32MultiArray, '/robot_pose', self.qos)
         
-        self.create_timer(0.01, self.cmd_cb)
         self.create_timer(0.01, self.robot_pose)
 
     def robot_pose(self):
@@ -116,9 +115,6 @@ class IsaacEnvROS2(Node):
         yaw = math.atan2(math.sin(yaw), math.cos(yaw))
         
         return roll, pitch, yaw
-
-    def cmd_cb(self):
-        self.publisher_cmd_vel.publish(self.cmd_vel)
 
     def min_dist_cb(self, msg):
         self.local_min_dist = msg.data[0]
@@ -165,12 +161,16 @@ class IsaacEnvROS2(Node):
     def step(self, action, time_steps, max_episode_steps):
         self.done = False
         
-        omega = action[0]
-        if np.abs(action[0]) > self.max_omega:
-            omega = np.clip(action[0], -self.max_omega, self.max_omega)
+        # omega = action[0]
+        # if np.abs(action[0]) > self.max_omega:
+        #     omega = np.clip(action[0], -self.max_omega, self.max_omega)
+        omega = action
+        if np.abs(action) > self.max_omega:
+            omega = np.clip(action, -self.max_omega, self.max_omega)
         
         self.cmd_vel.linear.x = self.min_vel
         self.cmd_vel.angular.z = float(omega)
+        self.publisher_cmd_vel.publish(self.cmd_vel)
         
         simulation_context.step(render=True)
         
@@ -267,15 +267,15 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, default=12001, metavar='N', help='maximum number of steps (default: 5000)')
     parser.add_argument('--hidden_size', type=int, default=128, metavar='N', help='hidden size (default: 256)')
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
-    parser.add_argument('--start_steps', type=int, default=500000, metavar='N',help='Steps sampling random actions (default: 10000)')
+    parser.add_argument('--start_steps', type=int, default=1, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
-    parser.add_argument('--replay_size', type=int, default=400000, metavar='N', help='size of replay buffer (default: 10000000)')
+    parser.add_argument('--replay_size', type=int, default=40000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
     parser.add_argument('--cuda', action="store_true", default=True, help='run on CUDA (default: False)')
     args = parser.parse_args()
 
     size = 5.0
-    angle_bins, z_bins = 180, 10
+    angle_bins, z_bins = 20, 1
     lidar_preprocessing = LidarPreprocessing(angle_bins, z_bins)
     env = IsaacEnvROS2(size, angle_bins, z_bins)
 
@@ -311,26 +311,37 @@ if __name__ == '__main__':
     total_numsteps = 0
     max_episode_steps = 10000000
     
+    expl_decay_steps = 500000
+    expl_noise = math.pi / 4
+    expl_min = 0.1
+    
     try:
         while rclpy.ok():
             for i_episode in itertools.count(1):
                 episode_reward = 0
                 episode_steps = 0
                 done = False
-                share = 10000
+                share = 100
                 
                 state, state_add = env.reset()
                 
                 while not done:
                     print(f"episode step:{episode_steps}, total steps:{total_numsteps}")
-                    if total_numsteps >= args.start_steps:
-                        action = agent.select_action(state, state_add)
-                        action += np.random.normal(-0.2, 0.2, 1)
-                    elif total_numsteps % share <= 0.7*share:
-                        action = np.random.uniform(-math.pi/4, math.pi/4, 1)
+                    if expl_noise>expl_min:
+                        expl_noise=expl_noise-((1-expl_min)/expl_decay_steps)
+                    if total_numsteps<10:
+                        action=np.random.uniform(-math.pi/4, math.pi/4, size=action_space)
                     else:
                         action = agent.select_action(state, state_add)
-                        action += np.random.normal(-0.2, 0.2, 1)
+                        action=(action+np.random.normal(-expl_noise, expl_noise, size=action_space)).clip(-math.pi/4,math.pi/4)
+                    # if total_numsteps >= args.start_steps:
+                    #     action = agent.select_action(state, state_add)
+                    #     action += np.random.normal(-0.2, 0.2, 1)
+                    # elif total_numsteps % share <= 0.8*share:
+                    #     action = np.random.uniform(-math.pi/4, math.pi/4, 1)
+                    # else:
+                    #     action = agent.select_action(state, state_add)
+                    #     action += np.random.normal(-0.2, 0.2, 1)
 
                     if len(memory) > args.batch_size:
                         av_critic_loss, av_Q, max_Q = agent.update_parameters(memory, args)

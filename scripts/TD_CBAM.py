@@ -134,6 +134,7 @@ class TD3(object):
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters())
 
     def select_action(self, state, state_add):
+        print("Using Select Action")
         state = torch.FloatTensor(state).to(self.device)
         state = state.unsqueeze(0)
         state_add = torch.FloatTensor(state_add).to(self.device)

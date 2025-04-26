@@ -9,10 +9,10 @@ class RewardFunction:
         
         # Reward Coefficients
         self.done = False
-        self.time_threshold = 2000
+        self.time_threshold = 1500
         self.sigma = euclidean_dist / 3
         self.kappa_d = 100
-        self.kappa_p = self.kappa_d / 2
+        self.kappa_p = self.kappa_d / 10
     
     def original(self, remain_dist: float):
         kappa = 50*np.sqrt(2)
@@ -48,7 +48,7 @@ class RewardFunction:
         if delta_p < 0:
             ETA_p *= 2
         
-        ETA_t = max(0, self.time_steps - self.time_threshold / 2) // 2
+        ETA_t = max(0, self.time_steps - self.time_threshold / 2)
         
         R = ETA_d + ETA_p - ETA_t
         if R <= -self.kappa_d or self.time_steps >= self.max_episode_steps:
