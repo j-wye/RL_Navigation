@@ -190,7 +190,7 @@ class TD3(object):
         self.critic_optimizer.step()
 
         if self.count % self.policy_freq == 0:
-            actor_loss=-self.critic.Q1(state_batch,self.actor(state_batch, state_batch_add)).mean()
+            actor_loss=-self.critic.Q1(state_batch,state_batch_add,self.actor(state_batch, state_batch_add)).mean()
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             self.actor_optimizer.step()
