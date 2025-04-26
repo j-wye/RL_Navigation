@@ -195,18 +195,32 @@ class TD3(object):
         self.critic_optimizer.step()
 
         if self.count % self.policy_freq == 0:
-            actor_loss=-self.critic.Q1(state_batch,state_batch_add,self.actor(state_batch, state_batch_add)).mean()
+            actor_grad, _ = self.critic(state_batch, state_batch_add, self.actor(state_batch, state_batch_add))
+            actor_grad = -actor_grad.mean()
             self.actor_optimizer.zero_grad()
-            actor_loss.backward()
+            actor_grad.backward()
             self.actor_optimizer.step()
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
             for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-        
         av_loss += loss
         av_loss /= (self.count + 1)
         return av_loss, av_Q, max_Q 
+
+        # if self.count % self.policy_freq == 0:
+        #     actor_loss=-self.critic.Q1(state_batch,state_batch_add,self.actor(state_batch, state_batch_add)).mean()
+        #     self.actor_optimizer.zero_grad()
+        #     actor_loss.backward()
+        #     self.actor_optimizer.step()
+        #     for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+        #         target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        #     for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+        #         target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        
+        # av_loss += loss
+        # av_loss /= (self.count + 1)
+        # return av_loss, av_Q, max_Q 
 
 
     # Save model parameters
