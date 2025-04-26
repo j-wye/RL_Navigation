@@ -112,6 +112,11 @@ class Critic(nn.Module):
         return q1,q2
     
     def Q1(self, s,s_a, a):
+        s = self.cbam(s)
+        b, _, _, _ = s.size()
+        s = s.view(b,-1)
+        s = torch.concat((s,s_a), 1)
+
         s1 = F.relu(self.layer_1(s))
         self.layer_2_s(s1)
         self.layer_2_a(a)
