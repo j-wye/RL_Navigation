@@ -142,7 +142,7 @@ class IsaacEnvROS2(Node):
         simulation_context.reset()
         self.parameters_reset()
         obstacle = Obstacle(self.size)
-        cylinder_coords = obstacle.three_static()
+        cylinder_coords = obstacle.three_random()
         self.next_state_add = self.goal - self.pose[:2]
         self.publish_cylinder_coords(cylinder_coords)
         return self.next_state, self.next_state_add
