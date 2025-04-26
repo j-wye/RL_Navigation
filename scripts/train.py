@@ -142,7 +142,7 @@ class IsaacEnvROS2(Node):
         simulation_context.reset()
         self.parameters_reset()
         obstacle = Obstacle(self.size)
-        cylinder_coords = obstacle.three_static()
+        cylinder_coords = obstacle.five_static()
         self.next_state_add = self.goal - self.pose[:2]
         self.publish_cylinder_coords(cylinder_coords)
         return self.next_state, self.next_state_add
@@ -230,6 +230,31 @@ class Obstacle():
             [1.0, 4.0, self.cylinder_height / 2],
             [2.5, 2.5, self.cylinder_height / 2],
             [4.0, 1.0, self.cylinder_height / 2]
+        ]
+        for i, coords in enumerate(cylinder_coords):
+            self.create_cylinder(f"/World/Obstacles/Cylinder_{i+1}", coords)
+        return cylinder_coords
+    
+    def four_static(self):
+        self.create_wall()
+        cylinder_coords = [
+            [1.0, 4.0, self.cylinder_height / 2],
+            [2.0, 3.0, self.cylinder_height / 2],
+            [3.0, 2.0, self.cylinder_height / 2],
+            [4.0, 1.0, self.cylinder_height / 2]
+        ]
+        for i, coords in enumerate(cylinder_coords):
+            self.create_cylinder(f"/World/Obstacles/Cylinder_{i+1}", coords)
+        return cylinder_coords
+    
+    def five_static(self):
+        self.create_wall()
+        cylinder_coords = [
+            [1.0, 5.0, self.cylinder_height / 2],
+            [2.0, 4.0, self.cylinder_height / 2],
+            [3.0, 3.0, self.cylinder_height / 2],
+            [4.0, 2.0, self.cylinder_height / 2],
+            [5.0, 1.0, self.cylinder_height / 2]
         ]
         for i, coords in enumerate(cylinder_coords):
             self.create_cylinder(f"/World/Obstacles/Cylinder_{i+1}", coords)
