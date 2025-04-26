@@ -161,12 +161,12 @@ class IsaacEnvROS2(Node):
     def step(self, action, time_steps, max_episode_steps):
         self.done = False
         
-        # omega = action[0]
-        # if np.abs(action[0]) > self.max_omega:
-        #     omega = np.clip(action[0], -self.max_omega, self.max_omega)
-        omega = action
-        if np.abs(action) > self.max_omega:
-            omega = np.clip(action, -self.max_omega, self.max_omega)
+        omega = action[0]
+        if np.abs(action[0]) > self.max_omega:
+            omega = np.clip(action[0], -self.max_omega, self.max_omega)
+        # omega = action
+        # if np.abs(action) > self.max_omega:
+        #     omega = np.clip(action, -self.max_omega, self.max_omega)
         
         self.cmd_vel.linear.x = self.min_vel
         self.cmd_vel.angular.z = float(omega)
