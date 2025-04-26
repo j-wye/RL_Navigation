@@ -164,9 +164,6 @@ class IsaacEnvROS2(Node):
         omega = action[0]
         if np.abs(action[0]) > self.max_omega:
             omega = np.clip(action[0], -self.max_omega, self.max_omega)
-        # omega = action
-        # if np.abs(action) > self.max_omega:
-        #     omega = np.clip(action, -self.max_omega, self.max_omega)
         
         self.cmd_vel.linear.x = self.min_vel
         self.cmd_vel.angular.z = float(omega)
@@ -250,11 +247,11 @@ class Obstacle():
     def five_static(self):
         self.create_wall()
         cylinder_coords = [
-            [1.0, 5.0, self.cylinder_height / 2],
-            [2.0, 4.0, self.cylinder_height / 2],
-            [3.0, 3.0, self.cylinder_height / 2],
-            [4.0, 2.0, self.cylinder_height / 2],
-            [5.0, 1.0, self.cylinder_height / 2]
+            [5.0, 0.0, self.cylinder_height / 2],
+            [3.75, 1.25, self.cylinder_height / 2],
+            [2.5, 2.5, self.cylinder_height / 2],
+            [1.25, 3.75, self.cylinder_height / 2],
+            [0.0, 5.0, self.cylinder_height / 2]
         ]
         for i, coords in enumerate(cylinder_coords):
             self.create_cylinder(f"/World/Obstacles/Cylinder_{i+1}", coords)
@@ -316,7 +313,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     size = 5.0
-    angle_bins, z_bins = 20, 1
+    angle_bins, z_bins = 180, 10
     lidar_preprocessing = LidarPreprocessing(angle_bins, z_bins)
     env = IsaacEnvROS2(size, angle_bins, z_bins)
 
