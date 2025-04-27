@@ -142,7 +142,7 @@ class IsaacEnvROS2(Node):
         simulation_context.reset()
         self.parameters_reset()
         obstacle = Obstacle(self.size)
-        cylinder_coords = obstacle.four_static()
+        cylinder_coords = obstacle.two_static()
         self.next_state_add = self.goal - self.pose[:2]
         self.publish_cylinder_coords(cylinder_coords)
         return self.next_state, self.next_state_add
@@ -220,6 +220,16 @@ class Obstacle():
         UsdPhysics.RigidBodyAPI.Apply(world.stage.GetPrimAtPath(prim_path))
         UsdPhysics.CollisionAPI.Apply(world.stage.GetPrimAtPath(prim_path))
         cylinder_xform.set_world_pose(coords, [0, 0, 0, 1])
+   
+    def two_static(self):
+        self.create_wall()
+        cylinder_coords = [
+            [1.0, 4.0, self.cylinder_height / 2],
+            [4.0, 1.0, self.cylinder_height / 2]
+        ]
+        for i, coords in enumerate(cylinder_coords):
+            self.create_cylinder(f"/World/Obstacles/Cylinder_{i+1}", coords)
+        return cylinder_coords
     
     def three_static(self):
         self.create_wall()
@@ -307,7 +317,7 @@ if __name__ == '__main__':
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
     parser.add_argument('--start_steps', type=int, default=1, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
-    parser.add_argument('--replay_size', type=int, default=40000, metavar='N', help='size of replay buffer (default: 10000000)')
+    parser.add_argument('--replay_size', type=int, default=100000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
     parser.add_argument('--cuda', action="store_true", default=True, help='run on CUDA (default: False)')
     args = parser.parse_args()
@@ -359,7 +369,7 @@ if __name__ == '__main__':
                 episode_reward = 0
                 episode_steps = 0
                 done = False
-                share = 100
+                # share = 100
                 
                 state, state_add = env.reset()
                 
@@ -387,6 +397,7 @@ if __name__ == '__main__':
                         writer.add_scalar('av_critic_loss', av_critic_loss, total_numsteps)
                         writer.add_scalar('av_Q', av_Q, total_numsteps)
                         writer.add_scalar('max_Q', max_Q, total_numsteps)
+                        torch.cuda.empty_cache()
                         
                     next_state, next_state_add, reward, done = env.step(action, episode_steps, max_episode_steps)
                     episode_steps += 1
