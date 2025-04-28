@@ -1,5 +1,7 @@
 # RL_Navigation
 
+### Research Log [🔗](./research_log/2504_log.md)
+
 How to Set:
 ```bash
 cd && mkdir -p rl_navigation/src && cd rl_navigation
