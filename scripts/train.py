@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from replay_memory import ReplayMemory
 from reward import RewardFunction
 from lidar_preprocessing import LidarPreprocessing
+from potential_field import PotentialFieldForce, PotentialFieldEnergy
 from geometry_msgs.msg import Twist
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from std_msgs.msg import Float32MultiArray
@@ -25,7 +26,7 @@ from pxr import UsdGeom, UsdPhysics, Gf, PhysxSchema, Sdf
 
 scripts_path = os.path.abspath(os.path.dirname(__file__))
 pkg_path = os.path.dirname(scripts_path)
-usd_file_path = os.path.join(pkg_path, "usd/train_model.usd")
+usd_file_path = os.path.join(pkg_path, "usd/carter.usd")
 
 ext_manager = omni.kit.app.get_app().get_extension_manager()
 ext_manager.set_extension_enabled_immediate("omni.isaac.ros2_bridge", True)
@@ -55,7 +56,7 @@ class IsaacEnvROS2(Node):
         # self.max_vel = 1.0
         self.min_vel = 0.5
         self.max_omega = math.pi / 4
-        self.COLLISION_THRESHOLD = 0.33
+        self.COLLISION_THRESHOLD = 0.45
         self.collision_bool = False
         self.done = False
         self.remain_dist = self.euclidean_dist
@@ -79,7 +80,7 @@ class IsaacEnvROS2(Node):
 
     def robot_pose(self):
         try:
-            robot_prim_path = "/World/mobile_manipulator/base_link/base_body"
+            robot_prim_path = "/World/Nova_Carter_ROS/chassis_link"
             robot_prim = world.stage.GetPrimAtPath(robot_prim_path)
             if robot_prim.IsValid():
                 xform = UsdGeom.Xformable(robot_prim)
@@ -143,7 +144,7 @@ class IsaacEnvROS2(Node):
         self.parameters_reset()
         obstacle = Obstacle(self.size)
         cylinder_coords = obstacle.two_static()
-        self.next_state_add = self.goal - self.pose[:2]
+        self.next_state_add = (self.goal - self.pose[:2]).astype(np.float32)
         self.publish_cylinder_coords(cylinder_coords)
         return self.next_state, self.next_state_add
     
@@ -164,6 +165,9 @@ class IsaacEnvROS2(Node):
         omega = action[0]
         if np.abs(action[0]) > self.max_omega:
             omega = np.clip(action[0], -self.max_omega, self.max_omega)
+        # omega = action
+        # if np.abs(action) > self.max_omega:
+        #     omega = np.clip(action, -self.max_omega, self.max_omega)
         
         self.cmd_vel.linear.x = self.min_vel
         self.cmd_vel.angular.z = float(omega)
@@ -180,6 +184,11 @@ class IsaacEnvROS2(Node):
         reward_function = RewardFunction(self.euclidean_dist, time_steps, max_episode_steps, self.collision_bool)
         reward, self.done = reward_function.optimized(self.remain_dist)
         return self.next_state, self.next_state_add, reward, self.done
+    
+    def compute_potential_action(self):
+        pff = PotentialFieldForce(self.goal, self.pose, self.voxel_data, self.COLLISION_THRESHOLD)
+        action = pff.compute_force()
+        return action
 
 class Obstacle():
     def __init__(self, size):
@@ -315,7 +324,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, default=12001, metavar='N', help='maximum number of steps (default: 5000)')
     parser.add_argument('--hidden_size', type=int, default=128, metavar='N', help='hidden size (default: 256)')
     parser.add_argument('--updates_per_step', type=int, default=1, metavar='N', help='model updates per simulator step (default: 1)')
-    parser.add_argument('--start_steps', type=int, default=1, metavar='N',help='Steps sampling random actions (default: 10000)')
+    parser.add_argument('--start_steps', type=int, default=10000, metavar='N',help='Steps sampling random actions (default: 10000)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N', help='Value target update per no. of updates per step (default: 1)')
     parser.add_argument('--replay_size', type=int, default=100000, metavar='N', help='size of replay buffer (default: 10000000)')
     parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G', help='Automaically adjust α (default: False)')
@@ -369,27 +378,35 @@ if __name__ == '__main__':
                 episode_reward = 0
                 episode_steps = 0
                 done = False
-                # share = 100
+                share = 100
                 
                 state, state_add = env.reset()
                 
                 while not done:
                     print(f"episode step:{episode_steps}, total steps:{total_numsteps}")
-                    if expl_noise>expl_min:
-                        expl_noise=expl_noise-((1-expl_min)/expl_decay_steps)
-                    if total_numsteps<10:
-                        action=np.random.uniform(-math.pi/4, math.pi/4, size=action_space)
+                    if total_numsteps < args.start_steps:
+                        action = np.random.uniform(-math.pi, math.pi, size=action_space)
                     else:
                         action = agent.select_action(state, state_add)
-                        action=(action+np.random.normal(-expl_noise, expl_noise, size=action_space)).clip(-math.pi/4,math.pi/4)
-                    # if total_numsteps >= args.start_steps:
-                    #     action = agent.select_action(state, state_add)
-                    #     action += np.random.normal(-0.2, 0.2, 1)
-                    # elif total_numsteps % share <= 0.8*share:
-                    #     action = np.random.uniform(-math.pi/4, math.pi/4, 1)
+                        action += np.random.normal(-0.5, 0.5, size=action_space)
+                    
+                    # action = env.compute_potential_action()
+                    # if expl_noise>expl_min:
+                    #     expl_noise=expl_noise-((1-expl_min)/expl_decay_steps)
+                    # if total_numsteps<120:
+                    #     action=np.random.uniform(math.pi/6, math.pi/4, size=action_space)
                     # else:
                     #     action = agent.select_action(state, state_add)
-                    #     action += np.random.normal(-0.2, 0.2, 1)
+                    #     action=(action+np.random.normal(-expl_noise, expl_noise, size=action_space))
+                        
+                    # if total_numsteps >= args.start_steps:
+                    #     action = agent.select_action(state, state_add)
+                    #     action += np.random.normal(-0.5, 0.5, 1)
+                    # elif total_numsteps % share <= 0.8*share:
+                    #     action = np.random.uniform(-math.pi, math.pi, 1)
+                    # else:
+                    #     action = agent.select_action(state, state_add)
+                    #     action += np.random.normal(-0.5, 0.5, 1)
 
                     if len(memory) > args.batch_size:
                         av_critic_loss, av_Q, max_Q = agent.update_parameters(memory, args)
