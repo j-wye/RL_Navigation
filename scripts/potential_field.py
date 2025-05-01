@@ -1,67 +1,89 @@
 import numpy as np
 
 class PotentialFieldForce:
-    def __init__(self, goal, pose, voxel_data):
+    def __init__(self, goal, pose, voxel_data, COLLISION_THRESHOLD):
         self.goal = goal
         self.pose = pose[:2]
         self.yaw = pose[2]
         self.voxel_data = voxel_data
-        self.k_att = 1.0
-        self.k_rep = 10000000.0
-        self.repulsive_radius = 0.5
-        
-    def compute_force(self):
-        F_att = self.k_att * (self.goal - self.pose)
-        
-        obstacle = np.stack([
-            self.voxel_data[:, :, 0].ravel(),
-            self.voxel_data[:, :, 1].ravel()
-        ], axis=1)
-        
-        diff = obstacle - self.pose[:2]
-        dist = np.linalg.norm(diff, axis=1)
-        mask = dist < self.repulsive_radius
-        valid_diff = diff[mask]
-        valid_dist = dist[mask]
-        
-        coef = self.k_rep * (1.0 / valid_dist - 1.0 / self.repulsive_radius) * (1.0 / valid_dist**2)
-        F_rep = np.sum((valid_diff.T * coef).T, axis=0)
-        
-        F_total = F_att + F_rep
-        print(f"F_att: {F_att}, F_rep: {F_rep}")
-        return F_total
-
-    def compute_action(self):
-        F_total = self.compute_force()
-        print(f"F_total: {F_total}")
-        angle = np.arctan2(F_total[1], F_total[0]) - self.yaw
-        angle = 2 * ((angle + np.pi) % (2 * np.pi) - np.pi)
-        action = np.clip(angle, -np.pi/4, np.pi/4)
-        return action
+        self.kappa_a = 1.0
+        self.kappa_b = 10.0
+        self.kappa_r = 100.0
+        self.rho = COLLISION_THRESHOLD * 2.5
     
-class PotentialFieldEnergy:
-    def __init__(self, goal, pose, voxel_data):
-        self.goal = goal
-        self.pose = pose
-        self.voxel_data = voxel_data
-        self.k_att = 1.0
-        self.k_rep = 100.0
-        self.repulsive_radius = 1.0
+    def attractive_force(self):
+        remain_dist = np.linalg.norm(self.goal - self.pose)
+        if remain_dist <= self.rho:
+            return self.kappa_a * (self.goal - self.pose)
+        else:
+            return self.kappa_b * (self.goal - self.pose) / remain_dist
+
+    def repulsive_force(self):
+        obj_local = np.stack([self.voxel_data[:, :, 0].ravel(),
+                              self.voxel_data[:, :, 1].ravel()], axis=1)
         
-    def compute_potential(self, pose, voxel_data):
-        dist_to_goal = np.linalg.norm(self.pose - self.goal)
-        U_att = 0.5 * self.k_att * (dist_to_goal**2)
+        
+        R = np.array([[np.cos(self.yaw), -np.sin(self.yaw)],
+                      [np.sin(self.yaw), np.cos(self.yaw)]])
+        t = self.pose.reshape(2, 1)
+        
+        obj_global = (R @ obj_local.T + t).T
+        dists = np.linalg.norm(obj_global - self.pose, axis=1)
+        
+        idx = np.argmin(dists)
+        d_min = dists[idx]
+        closest_obj = obj_global[idx]
+        
+        delta = self.pose - closest_obj
+        
+        if 0 <= d_min <= self.rho:
+            direction = delta / d_min
+            magnitude = self.kappa_r * (1 / d_min - 1 / self.rho) * (1 / d_min**2)
+            return direction * magnitude
+        else:
+            return np.zeros(2, dtype=np.float32)
 
-        # 2) Repulsive potential: sum over obstacles within d0
-        obstacle = np.stack([
-            voxel_data[:, :, 0].ravel(),
-            voxel_data[:, :, 1].ravel()
-        ], axis=1)
-        dists = np.linalg.norm(self.pose - obstacle, axis=1)
-        mask = (dists > 0) & (dists < self.repulsive_radius)
-        valid_dists = dists[mask]
+    def compute_force(self):
+        F = self.attractive_force() + self.repulsive_force()
+        yaw = np.arctan2(F[1], F[0])
+        yaw_desired = (yaw - self.yaw + np.pi) % (2 * np.pi) - np.pi
+        return float(yaw_desired)
 
-        U_rep = np.sum(0.5 * self.k_rep * (1.0/valid_dists - 1.0/self.repulsive_radius)**2)
-
-        U_total = U_att + U_rep
-        return U_total
+class PotentialFieldEnergy:
+    def __init__(self, goal, pose, voxel_data, COLLISION_THRESHOLD):
+        self.goal = goal
+        self.pose = pose[:2]
+        self.yaw = pose[2]
+        self.voxel_data = voxel_data
+        self.kappa_a = 1.0
+        self.kappa_b = 2.0
+        self.kappa_r = 100.0
+        self.rho = COLLISION_THRESHOLD * 2.5
+    
+    def attractive_energy(self):
+        remain_dist = np.linalg.norm(self.goal - self.pose)
+        if 0 <= remain_dist <= self.rho:
+            return 0.5 * self.kappa_a * (remain_dist**2)
+        else:
+            return self.kappa_b * remain_dist
+    
+    def repulsive_energy(self):
+        obj_local = np.stack([self.voxel_data[:, :, 0].ravel(),
+                              self.voxel_data[:, :, 1].ravel()], axis=1)
+        
+        R = np.array([[np.cos(self.yaw), -np.sin(self.yaw)],
+                      [np.sin(self.yaw), np.cos(self.yaw)]])
+        t = self.pose.reshape(2, 1)
+        
+        obj_global = (R @ obj_local.T + t).T
+        
+        dists = np.linalg.norm(obj_global - self.pose, axis=1)
+        d_min = np.min(dists) if len(dists) > 0 else float('inf')
+        
+        if 0 <= d_min <= self.rho:
+            return 0.5 * self.kappa_r * ((1 / d_min - 1 / self.rho)**2)
+        else:
+            return 0.0
+    
+    def compute_energy(self):
+        return float(self.attractive_energy() + self.repulsive_energy())
